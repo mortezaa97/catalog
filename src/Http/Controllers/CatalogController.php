@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Catalog;
 use Illuminate\Http\Request;;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\DB;
 use Mortezaa97\Catalogs\Http\Resources\CatalogResource;
+use Mortezaa97\Catalogs\Models\Catalog;
+
 class CatalogController extends Controller
 {
     public function index()

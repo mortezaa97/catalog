@@ -3,11 +3,12 @@
 namespace Mortezaa97\Catalogs\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\ModelHasCatalog;
 use Illuminate\Http\Request;;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\DB;
 use Mortezaa97\Catalogs\Http\Resources\ModelHasCatalogResource;
+use Mortezaa97\Catalogs\Models\ModelHasCatalog;
+
 class ModelHasCatalogController extends Controller
 {
     public function index()
