@@ -45,11 +45,11 @@ class Catalog extends Model
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
-    public function products(): \Illuminate\Database\Eloquent\Relations\MorphToMany
+    public function items($itemType): \Illuminate\Database\Eloquent\Relations\MorphToMany
     {
-        return $this->morphedByMany(related: Product::class, name: 'model', table: 'model_has_catalogs')
-            ->withoutGlobalScope('products.order')
-            ->withPivot('order')
-            ->reorder('model_has_catalogs.order');
+        return $this->morphedByMany(related: $itemType, name: 'model', table: 'model_has_catalogs')
+                ->withoutGlobalScopes()
+                ->withPivot('sort')
+                ->reorder('model_has_catalogs.sort');
     }
 }

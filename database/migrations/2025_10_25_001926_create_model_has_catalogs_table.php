@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('catalog_id')->constrained('catalogs');
             $table->morphs('model');
             $table->unique(['catalog_id', 'model_id', 'model_type']);
+            $table->smallInteger('sort')->default(0);
             $table->timestamps();
         });
     }
