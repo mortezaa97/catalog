@@ -52,4 +52,9 @@ class Catalog extends Model
                 ->withPivot('sort')
                 ->reorder('model_has_catalogs.sort');
     }
+
+    public function modelHasCatalogs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ModelHasCatalog::class, 'catalog_id');
+    }
 }
