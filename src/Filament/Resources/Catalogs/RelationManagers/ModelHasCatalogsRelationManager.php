@@ -66,6 +66,33 @@ class ModelHasCatalogsRelationManager extends RelationManager
         return self::sanitizeOptions($options);
     }
 
+    public static function getProductVariantOptions(): array
+    {
+        $modelType = 'Mortezaa97\Shop\Models\Product';
+        if (!class_exists($modelType)) {
+            return [];
+        }
+        
+        // Get product variants (products with parent_id)
+        $variants = $modelType::query()
+            ->with('parent') // Load parent relationship
+            ->whereNotNull('parent_id')
+            ->limit(1000)
+            ->get();
+        
+        $options = [];
+        foreach ($variants as $variant) {
+            $parentName = $variant->parent ? ($variant->parent->title ?? $variant->parent->name ?? 'محصول والد') : 'محصول والد';
+            $variantName = $variant->title ?? $variant->name ?? $variant->id;
+            $options[$variant->id] = $parentName . ' - ' . $variantName;
+        }
+        
+        // Sort by name
+        asort($options);
+        
+        return self::sanitizeOptions($options);
+    }
+
     public static function getPostOptions(): array
     {
         $modelType = 'App\Models\Post';
@@ -157,6 +184,79 @@ class ModelHasCatalogsRelationManager extends RelationManager
                                 ->columnSpan(12)
                                 ->placeholder('محصولات موردنظر را انتخاب کنید')
                                 ->helperText('می‌توانید چند محصول را همزمان انتخاب کنید'),
+                        ])
+                        ->columns(12)
+                        ->columnSpan(12),
+                ])
+                ->columns(12)
+                ->columnSpan(12)
+        ])
+        ->columns(12);
+    }
+
+    public static function formProductVariant(Schema $schema): Schema
+    {
+        return $schema->components([
+            \Filament\Schemas\Components\Group::make()
+                ->schema([
+                    \Filament\Schemas\Components\Section::make('افزودن تنوع محصول به کاتالوگ')
+                        ->description('یک یا چند تنوع محصول را به کاتالوگ اضافه کنید')
+                        ->schema([
+                            Select::make('model_ids')
+                                ->label('تنوع محصولات')
+                                ->options(fn () => self::getProductVariantOptions())
+                                ->getSearchResultsUsing(function (string $search) {
+                                    $modelType = 'Mortezaa97\Shop\Models\Product';
+                                    if (!class_exists($modelType)) {
+                                        return [];
+                                    }
+                                    
+                                    $variants = $modelType::query()
+                                        ->with('parent')
+                                        ->whereHas('parent', function ($query) use ($search) {
+                                            $query->where('name', 'like', "%{$search}%");
+                                        })
+                                        ->whereNotNull('parent_id')
+                                        ->limit(50)
+                                        ->get();
+                                    
+                                    $options = [];
+                                    foreach ($variants as $variant) {
+                                        $parentName = $variant->parent ? ($variant->parent->title ?? $variant->parent->name ?? 'محصول والد') : 'محصول والد';
+                                        $variantName = $variant->title ?? $variant->name ?? $variant->id;
+                                        $options[$variant->id] = $parentName . ' - ' . $variantName;
+                                    }
+                                    
+                                    return $options;
+                                })
+                                ->getOptionLabelsUsing(function (array $values): array {
+                                    $modelType = 'Mortezaa97\Shop\Models\Product';
+                                    if (!class_exists($modelType)) {
+                                        return [];
+                                    }
+                                    
+                                    $variants = $modelType::query()
+                                        ->with('parent')
+                                        ->whereIn('id', $values)
+                                        ->whereNotNull('parent_id')
+                                        ->get();
+                                    
+                                    $options = [];
+                                    foreach ($variants as $variant) {
+                                        $parentName = $variant->parent ? ($variant->parent->title ?? $variant->parent->name ?? 'محصول والد') : 'محصول والد';
+                                        $variantName = $variant->title ?? $variant->name ?? $variant->id;
+                                        $options[$variant->id] = $parentName . ' - ' . $variantName;
+                                    }
+                                    
+                                    return $options;
+                                })
+                                ->searchable()
+                                ->required()
+                                ->multiple()
+                                ->preload()
+                                ->columnSpan(12)
+                                ->placeholder('تنوع محصولات موردنظر را انتخاب کنید')
+                                ->helperText('می‌توانید چند تنوع محصول را همزمان انتخاب کنید'),
                         ])
                         ->columns(12)
                         ->columnSpan(12),
@@ -354,7 +454,17 @@ class ModelHasCatalogsRelationManager extends RelationManager
                         try {
                             $model = $modelType::find($record->model_id);
                             // Cast to string if both title/name are not present (null), fallback to id
-                            return $model ? ((isset($model->title) && $model->title !== null) ? $model->title : ((isset($model->name) && $model->name !== null) ? $model->name : (string) $model->id)) : (string) $record->model_id;
+                            if ($model) {
+                                // If product has parent_id, it's a variant; show: parent name - name
+                                if (isset($model->parent_id) && $model->parent_id) {
+                                    $parentName = $model->parent ? ($model->parent->title ?? $model->parent->name ?? 'محصول والد') : 'محصول والد';
+                                    $variantName = $model->title ?? $model->name ?? (string) $model->id;
+                                    return $parentName . ' - ' . $variantName;
+                                }
+                                // Else, fallback: title, name, or id
+                                return $model->title ?? $model->name ?? (string) $model->id;
+                            }
+                            return (string) $record->model_id;
                         } catch (\Exception $e) {
                             return (string) $record->model_id;
                         }
@@ -402,6 +512,29 @@ class ModelHasCatalogsRelationManager extends RelationManager
                     })
                     ->successNotificationTitle('محصولات با موفقیت اضافه شدند')
                     ->schema(fn (Schema $schema) => self::formProduct($schema)),
+
+                CreateAction::make('add_product_variant')
+                    ->label('افزودن تنوع محصول')
+                    ->icon('heroicon-o-squares-2x2')
+                    ->color('info')
+                    ->using(function (array $data, RelationManager $livewire) {
+                        $modelIds = $data['model_ids'] ?? [];
+                        $maxSort = $livewire->getRelationship()->max('sort') ?? -1;
+                        
+                        $created = [];
+                        foreach ($modelIds as $modelId) {
+                            $maxSort++;
+                            $created[] = $livewire->getRelationship()->create([
+                                'model_type' => 'Mortezaa97\Shop\Models\Product',
+                                'model_id' => $modelId,
+                                'sort' => $maxSort,
+                            ]);
+                        }
+                        
+                        return $created[0] ?? null;
+                    })
+                    ->successNotificationTitle('تنوع محصولات با موفقیت اضافه شدند')
+                    ->schema(fn (Schema $schema) => self::formProductVariant($schema)),
 
                 CreateAction::make('add_post')
                     ->label('افزودن مقاله')

@@ -32,6 +32,7 @@ class CatalogsTable
                 \App\Filament\Components\Table\CreatedAtTextColumn::create(),
                 \App\Filament\Components\Table\UpdatedAtTextColumn::create(),
             ])
+            ->reorderable('order_id')
             ->filters([
                 TrashedFilter::make(),
             ])
