@@ -581,7 +581,7 @@ class ModelHasCatalogsRelationManager extends RelationManager
                     ->schema(fn (Schema $schema) => self::formPage($schema)),
             ])
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()->iconButton()->tooltip('ویرایش'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
